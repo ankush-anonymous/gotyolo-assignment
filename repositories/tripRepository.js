@@ -105,6 +105,25 @@ async function remove(id) {
   return result.rowCount > 0;
 }
 
+async function getByIdForUpdate(tripId, client) {
+  const runner = client || pool;
+  const result = await runner.query(
+    `SELECT id, title, price, max_capacity, available_seats, status
+     FROM trips WHERE id = $1 FOR UPDATE`,
+    [tripId]
+  );
+  return result.rows[0] || null;
+}
+
+async function decrementAvailableSeats(tripId, numSeats, client) {
+  const runner = client || pool;
+  const result = await runner.query(
+    `UPDATE trips SET available_seats = available_seats - $1, updated_at = NOW() WHERE id = $2`,
+    [numSeats, tripId]
+  );
+  return result.rowCount;
+}
+
 module.exports = {
   findAllPublished,
   findAll,
@@ -112,4 +131,6 @@ module.exports = {
   create,
   update,
   remove,
+  getByIdForUpdate,
+  decrementAvailableSeats,
 };

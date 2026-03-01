@@ -2,6 +2,15 @@
 
 Backend API for the GoTyolo travel booking platform (Node.js, Express, PostgreSQL).
 
+## Index
+
+- [1. Docker – Quick start](#1-docker--quick-start)
+- [2. Folder and file structure](#2-folder-and-file-structure)
+- [3. API overview – data flow](#3-api-overview--data-flow)
+- [4. Implementation logic (non-CRUD routes)](#4-implementation-logic-non-crud-routes)
+- [5. Testing guide (Postman)](#5-testing-guide-postman)
+- [6. Local setup (without Docker)](#6-local-setup-without-docker)
+
 ---
 
 ## 1. Docker – Quick start

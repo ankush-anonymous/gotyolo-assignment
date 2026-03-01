@@ -14,8 +14,18 @@ Backend API for the GoTyolo travel booking platform (Node.js, Express, PostgreSQ
 docker compose up --build
 ```
 
-- **db** – PostgreSQL 16 on port 5432 (user `app`, password `appsecret`, database `gotyolo`)
-- **app** – API on port 5001. On startup it runs **schema** (drop/recreate tables) and **seed** (trips + bookings), then starts the server.
+#### What happens when you run this
+
+| Order | Step | Service | What happens |
+|-------|------|---------|--------------|
+| 1 | **Postgres image** | db | Uses pre-built `postgres:16-alpine`. Container `gotyolo-db` starts, creates DB `gotyolo`, user `app`. Data stored in volume `pgdata`. |
+| 2 | **Healthcheck** | db | Waits for `pg_isready` to pass. App will not start until DB is ready. |
+| 3 | **Node image build** | app | Builds from `Dockerfile`: `node:20-alpine`, copies `package.json`, runs `npm ci`, copies source code. Produces image `gotyolo-app`. |
+| 4 | **App container start** | app | Container `gotyolo-app` starts. It depends on `db` being healthy, so it waits for step 2. |
+| 5 | **Schema** | app | Runs `node scripts/run-schema.js`: drops `bookings` and `trips` (if exist), recreates tables and enums from `schema.sql`. |
+| 6 | **Seed** | app | Runs `node scripts/seed.js`: inserts 7 trips (incl. 2 at-risk) and ~17 bookings in various states. Updates `trips.available_seats`. |
+| 7 | **API server** | app | Runs `node app.js`: connects to Postgres via `db:5432`, starts Express on port 5001, starts auto-expiry job (every 1 min). |
+| 8 | **Ready** | — | API at `http://localhost:5001`. DB at `localhost:5432` (optional host access). |
 
 ### Stop and remove
 

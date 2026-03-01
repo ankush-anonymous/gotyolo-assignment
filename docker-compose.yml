@@ -1,20 +1,31 @@
+# PostgreSQL + Node API; both on internal network. App connects to DB via hostname "db".
 services:
   db:
     image: postgres:16-alpine
+    container_name: gotyolo-db
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: appsecret
       POSTGRES_DB: gotyolo
-    ports:
-      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - gotyolo-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U app -d gotyolo"]
       interval: 2s
       timeout: 5s
       retries: 5
+    # Expose 5432 only if you need to connect from host (e.g. psql). Remove to keep DB internal only.
+    ports:
+      - "5432:5432"
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gotyolo-app
+    container_name: gotyolo-app
     depends_on:
       db:
         condition: service_healthy
@@ -22,5 +33,16 @@ services:
       DATABASE_URL: postgresql://app:appsecret@db:5432/gotyolo
       DATABASE_SSL: "false"
       PORT: 5001
+    # Run schema + seed then start app (same as: npm run schema && npm run seed && node app.js). Set SKIP_SCHEMA_SEED=1 to skip.
+    command: ["sh", "-c", "if [ -z \"$$SKIP_SCHEMA_SEED\" ]; then node scripts/run-schema.js && node scripts/seed.js; fi && exec node app.js"]
+    networks:
+      - gotyolo-net
     ports:
       - "5001:5001"
+
+networks:
+  gotyolo-net:
+    driver: bridge
+
+volumes:
+  pgdata:

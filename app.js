@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const { pool } = require("./db/connect");
 const routers = require("./routers");
+const adminRouter = require("./routers/adminRouter");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -15,6 +16,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api", routers);
+app.use("/admin", adminRouter);
 
 const { runExpireJob } = require("./jobs/expireBookings");
 

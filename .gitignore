@@ -73,6 +73,9 @@ web_modules/
 # Assignment / spec (keep repo clean)
 requirement.md
 
+# Plan files (local only)
+plans/
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

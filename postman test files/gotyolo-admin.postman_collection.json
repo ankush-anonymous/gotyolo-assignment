@@ -1,0 +1,31 @@
+{
+  "info": {
+    "name": "GoTyolo - Admin API",
+    "description": "Phase 6 Admin APIs: trip metrics and at-risk trips. Base URL: http://localhost:5001 (admin routes are under /admin, not /api). Set tripId from GET /api/trips or from a trip response.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" },
+    { "key": "tripId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Get Trip Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/trips/{{tripId}}/metrics",
+        "description": "GET /admin/trips/:tripId/metrics – Returns occupancy_percent, total_seats, booked_seats, available_seats, booking_summary (confirmed, pending_payment, cancelled, expired), financial (gross_revenue, refunds_issued, net_revenue). Set tripId to a valid trip UUID (e.g. from Get All Trips). 200 with metrics or 404 if trip not found."
+      }
+    },
+    {
+      "name": "Get At-Risk Trips",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/trips/at-risk",
+        "description": "GET /admin/trips/at-risk – Returns trips where departure is within 7 days AND occupancy < 50%. Response: { at_risk_trips: [ { trip_id, title, departure_date, occupancy_percent, reason } ] }. 200 always; array is empty if no trips match. Seed trips with start_date in the next 7 days and low bookings to see non-empty results."
+      }
+    }
+  ]
+}

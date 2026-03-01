@@ -200,7 +200,14 @@ If you run through this order and every request returns the expected status and 
 
 ## 5. Local setup (without Docker)
 
+When running locally, you need a `.env` file to connect to Postgres. Docker does not use `.env` (it gets config from `docker-compose.yml`).
+
 1. `npm install`
-2. Copy `.env.example` to `.env` and set `DATABASE_URL` (and `DATABASE_SSL=false` for local Postgres without SSL)
+2. Create a `.env` file with `DATABASE_URL` – the connection string to your local Postgres:
+   ```
+   DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+   DATABASE_SSL=false
+   ```
+   Example: `DATABASE_URL=postgresql://app:appsecret@localhost:5432/gotyolo`. Set `DATABASE_SSL=false` for local Postgres without SSL.
 3. `npm run schema` && `npm run seed`
 4. `npm run dev` (port 5001)

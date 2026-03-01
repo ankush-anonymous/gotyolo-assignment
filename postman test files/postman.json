@@ -1,13 +1,12 @@
 {
   "info": {
     "name": "GoTyolo - Trips API",
-    "description": "CRUD and list endpoints for trips. Base URL: http://localhost:3000/api",
+    "description": "CRUD endpoints for trips. Base URL: http://localhost:5001/api",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000/api" },
-    { "key": "tripId", "value": "" },
-    { "key": "bookingId", "value": "" }
+    { "key": "baseUrl", "value": "http://localhost:5001/api" },
+    { "key": "tripId", "value": "" }
   ],
   "item": [
     {
@@ -35,19 +34,6 @@
         "header": [],
         "url": "{{baseUrl}}/trips/{{tripId}}",
         "description": "Get a single trip by ID. Set tripId variable (e.g. from Create Trip response)."
-      }
-    },
-    {
-      "name": "Create Booking",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"num_seats\": 2,\n  \"user_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"idempotency_key\": \"optional-for-webhook-dedup\"\n}"
-        },
-        "url": "{{baseUrl}}/trips/{{tripId}}/book",
-        "description": "Book seats on a trip. Set tripId to a PUBLISHED trip UUID. Returns booking + payment_url. 409 if no seats or trip not published."
       }
     },
     {

@@ -124,6 +124,15 @@ async function decrementAvailableSeats(tripId, numSeats, client) {
   return result.rowCount;
 }
 
+async function incrementAvailableSeats(tripId, numSeats, client) {
+  const runner = client || pool;
+  const result = await runner.query(
+    `UPDATE trips SET available_seats = available_seats + $1, updated_at = NOW() WHERE id = $2`,
+    [numSeats, tripId]
+  );
+  return result.rowCount;
+}
+
 module.exports = {
   findAllPublished,
   findAll,
@@ -133,4 +142,5 @@ module.exports = {
   remove,
   getByIdForUpdate,
   decrementAvailableSeats,
+  incrementAvailableSeats,
 };

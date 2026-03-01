@@ -1,0 +1,67 @@
+{
+  "info": {
+    "name": "GoTyolo - Booking API",
+    "description": "Booking, payment webhook, get and cancel. Base URL: http://localhost:5001/api. Set tripId, bookingId from responses.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001/api" },
+    { "key": "tripId", "value": "" },
+    { "key": "bookingId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Get All Bookings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/bookings",
+        "description": "Returns all bookings, newest first."
+      }
+    },
+    {
+      "name": "Create Booking",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"num_seats\": 2,\n  \"user_id\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+        },
+        "url": "{{baseUrl}}/trips/{{tripId}}/book",
+        "description": "Book seats on a trip. Set tripId to a PUBLISHED trip UUID. Copy returned id into bookingId for other requests."
+      }
+    },
+    {
+      "name": "Get Booking By ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/bookings/{{bookingId}}",
+        "description": "Get a booking by ID. Set bookingId (e.g. from Create Booking). 200 with booking or 404 if not found."
+      }
+    },
+    {
+      "name": "Cancel Booking",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+        "description": "Cancel a CONFIRMED booking. Set bookingId. 200 with { cancelled: true, refund_amount } or 404 if not found, 409 if not CONFIRMED (Only CONFIRMED bookings can be cancelled)."
+      }
+    },
+    {
+      "name": "Payment Webhook",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"booking_id\": \"{{bookingId}}\",\n  \"status\": \"success\",\n  \"idempotency_key\": \"optional-for-webhook-dedup\",\n  \"payment_reference\": \"pay_abc123\"\n}"
+        },
+        "url": "{{baseUrl}}/payments/webhook",
+        "description": "Simulate payment provider callback. Set bookingId. status: success|failed. Always returns 200."
+      }
+    }
+  ]
+}

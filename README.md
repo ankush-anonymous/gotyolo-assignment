@@ -2,73 +2,195 @@
 
 Backend API for the GoTyolo travel booking platform (Node.js, Express, PostgreSQL).
 
-## Setup (local)
+---
 
-1. Clone and install: `npm install`
-2. Create `.env` from `.env.example` and set `DATABASE_URL` (and `DATABASE_SSL=false` for local Postgres without SSL).
-3. Apply schema and seed:
-   - `npm run schema`
-   - `npm run seed` (full seed: trips + bookings) or `npm run seed-trips` (trips only)
-4. Start: `npm run dev` (default port 5001)
+## 1. Docker – Quick start
 
-## Run with Docker
+**Prerequisites:** Docker and Docker Compose installed.
+
+### Build and run
 
 ```bash
 docker compose up --build
 ```
 
-- **db**: Postgres 16 on port 5432 (user `app`, password `appsecret`, db `gotyolo`).
-- **app**: API on port 5001. On first start it runs schema + seed, then starts the server.
-- To skip schema+seed on start: set env `SKIP_SCHEMA_SEED=1` for the app service.
+- **db** – PostgreSQL 16 on port 5432 (user `app`, password `appsecret`, database `gotyolo`)
+- **app** – API on port 5001. On startup it runs **schema** (drop/recreate tables) and **seed** (trips + bookings), then starts the server.
 
-Stop: `docker compose down`
-
-## Test the API
-
-**Base URL:** `http://localhost:5001` (or `http://localhost:3000` if you set `PORT=3000`)
-
-**Postman:** Import collections from `postman test files/`:
-
-- **GoTyolo - Trips API** – CRUD trips, base URL `http://localhost:5001/api`
-- **GoTyolo - Booking API** – create booking, get/cancel, payment webhook; set `tripId` / `bookingId` from responses
-- **GoTyolo - Admin API** – trip metrics, at-risk trips; base URL `http://localhost:5001`, set `tripId` from a trip
-
-**curl (smoke test):**
+### Stop and remove
 
 ```bash
-# Root
-curl http://localhost:5001/
-
-# Trips
-curl http://localhost:5001/api/trips
-curl http://localhost:5001/api/trips/published
-
-# Bookings (after seed)
-curl http://localhost:5001/api/bookings
-
-# Admin (use a real trip UUID from /api/trips for metrics)
-curl http://localhost:5001/admin/trips/at-risk
-TRIP_ID=$(curl -s http://localhost:5001/api/trips | node -e "const d=require('fs').readFileSync(0,'utf8'); const j=JSON.parse(d); console.log(j[0]?.id||'')")
-curl "http://localhost:5001/admin/trips/${TRIP_ID}/metrics"
+docker compose down
 ```
 
-Or run the script (after `chmod +x scripts/test-api.sh`):
+### Reset DB and rebuild
 
 ```bash
-./scripts/test-api.sh
+docker compose down && docker compose up --build
 ```
 
-## Main endpoints
+### Reset DB (including data volume)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /api/trips | All trips |
-| GET | /api/trips/published | Published trips only |
-| GET | /api/trips/:id | Trip by ID |
-| POST | /api/trips/:tripId/book | Create booking (body: `num_seats`, `user_id`) |
-| GET | /api/bookings | All bookings |
-| GET | /api/bookings/:id | Booking by ID |
-| POST | /api/bookings/:id/cancel | Cancel CONFIRMED booking |
-| POST | /api/payments/webhook | Payment webhook (body: `booking_id`, `status`, `idempotency_key`) |
-| GET | /admin/trips/:tripId/metrics | Trip metrics and financials |
-| GET | /admin/trips/at-risk | Trips at risk (departure &lt; 7 days, occupancy &lt; 50%) |
+```bash
+docker compose down -v && docker compose up --build
+```
+
+### Skip schema + seed on restart
+
+Set `SKIP_SCHEMA_SEED=1` in the app service environment in `docker-compose.yml` if you only want to restart the app without reseeding.
+
+**Base URL:** `http://localhost:5001`
+
+---
+
+## 2. Folder and file structure
+
+```
+gotyolo-assignment/
+├── app.js                    # Entry point: Express, routes, DB check, scheduler
+├── package.json
+├── Dockerfile
+├── docker-compose.yml
+├── schema.sql                # DB schema (trips, bookings)
+│
+├── db/
+│   └── connect.js            # PostgreSQL pool (from DATABASE_URL)
+│
+├── routers/
+│   ├── index.js              # Mounts /trips, /payments, /bookings, /admin
+│   ├── tripRouter.js         # /api/trips + POST /:tripId/book
+│   ├── bookingRouter.js      # /api/bookings
+│   ├── paymentsRouter.js     # /api/payments
+│   └── adminRouter.js        # /admin/trips
+│
+├── controllers/
+│   ├── tripController.js
+│   ├── bookingController.js
+│   ├── paymentController.js
+│   └── adminTripController.js
+│
+├── services/
+│   ├── bookingService.js     # Booking flow, cancel logic
+│   └── paymentService.js     # Webhook processing, idempotency
+│
+├── repositories/
+│   ├── tripRepository.js
+│   ├── bookingRepository.js
+│   └── adminTripRepository.js
+│
+├── jobs/
+│   └── expireBookings.js     # Auto-expire PENDING_PAYMENT (every 1 min)
+│
+├── scripts/
+│   ├── run-schema.js
+│   ├── seed.js               # Full seed: trips + bookings (incl. at-risk)
+│   ├── seed-trips.js         # Trips only
+│   └── test-api.sh           # Curl smoke test
+│
+└── postman test files/       # Postman collections (Trips, Booking, Admin)
+```
+
+---
+
+## 3. API overview – data flow
+
+| Method | Path | Router | Controller | Service | Repository | Purpose |
+|--------|------|--------|------------|---------|------------|---------|
+| GET | /api/trips | tripRouter | tripController.getAll | — | tripRepository.findAll | All trips |
+| GET | /api/trips/published | tripRouter | tripController.getPublished | — | tripRepository.findAllPublished | Published trips only |
+| GET | /api/trips/:id | tripRouter | tripController.getById | — | tripRepository.findById | Trip by ID |
+| POST | /api/trips | tripRouter | tripController.create | — | tripRepository.create | Create trip |
+| PUT | /api/trips/:id | tripRouter | tripController.update | — | tripRepository.update | Update trip |
+| DELETE | /api/trips/:id | tripRouter | tripController.remove | — | tripRepository.remove | Delete trip |
+| POST | /api/trips/:tripId/book | tripRouter | bookingController.createBooking | bookingService.createBooking | tripRepository.getByIdForUpdate, decrementAvailableSeats; bookingRepository.create | Create booking (lock trip, decrement seats, insert) |
+| GET | /api/bookings | bookingRouter | bookingController.getAll | bookingService.getAllBookings | bookingRepository.findAll | All bookings |
+| GET | /api/bookings/:id | bookingRouter | bookingController.getById | bookingService.getBooking | bookingRepository.findById | Booking by ID |
+| POST | /api/bookings/:id/cancel | bookingRouter | bookingController.cancel | bookingService.cancelBooking | bookingRepository.findByIdWithTrip, cancelBooking; tripRepository.incrementAvailableSeats | Cancel CONFIRMED, refund, release seats |
+| POST | /api/payments/webhook | paymentsRouter | paymentController.webhook | paymentService.processWebhook | bookingRepository.findByIdempotencyKey, getByIdForUpdate, updateBookingState; tripRepository.incrementAvailableSeats (on failed) | Payment success/failed → CONFIRMED/EXPIRED |
+| GET | /admin/trips/:tripId/metrics | adminRouter | adminTripController.getMetrics | — | adminTripRepository.getTripMetrics | Occupancy, booking_summary, financial |
+| GET | /admin/trips/at-risk | adminRouter | adminTripController.getAtRisk | — | adminTripRepository.getAtRiskTrips | Trips: departure < 7 days, occupancy < 50% |
+
+---
+
+## 4. Testing guide (Postman)
+
+**Import collections from `postman test files/`:** GoTyolo - Trips API, GoTyolo - Booking API, GoTyolo - Admin API.
+
+Use a **PUBLISHED** trip for booking. Copy `id` from responses into `tripId` and `bookingId` as needed.
+
+---
+
+### Step 1 – Trips (read)
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 1 | Get All Trips | Trips | Send. Copy one trip `id` → set **tripId** in the collection (or in all three). |
+| 2 | Get Published Trips | Trips | Send. Check only PUBLISHED trips are returned. |
+| 3 | Get Trip By ID | Trips | Send (uses `tripId`). Check 200 and correct trip. |
+
+---
+
+### Step 2 – Trips (create/update/delete)
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 4 | Create Trip | Trips | Send. Copy returned `id` → set **tripId** (or keep step 1 ID for booking). |
+| 5 | Update Trip | Trips | Change body (e.g. `title`, `price`, `status: "PUBLISHED"`). Send. Check 200. |
+| 6 | Get Trip By ID | Trips | Send. Confirm updated fields. |
+| 7 | Delete Trip | Trips | Optional: use a trip you don't need for bookings. Send. Then Get Trip By ID → 404. |
+
+---
+
+### Step 3 – Booking (full flow)
+
+Use a **PUBLISHED** trip for `tripId` (e.g. from step 1 or the one you updated to PUBLISHED in step 5).
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 8 | Create Booking | Booking | Set **tripId** = PUBLISHED trip ID. Send. Copy returned `id` → set **bookingId**. Check 201, `state: "PENDING_PAYMENT"`, `payment_url`. |
+| 9 | Get Booking By ID | Booking | Send. Check `state: "PENDING_PAYMENT"`. |
+| 10 | Payment Webhook | Booking | Body: `"status": "success"` (and same `booking_id`, `idempotency_key`). Send. Check 200, `received: true`. |
+| 11 | Get Booking By ID | Booking | Send again. Check `state: "CONFIRMED"`. |
+| 12 | Cancel Booking | Booking | Send (same `bookingId`). Check 200, `cancelled: true`, `refund_amount` (if before cutoff). |
+| 13 | Get Booking By ID | Booking | Send. Check `state: "CANCELLED"`. |
+
+---
+
+### Step 4 – Payment webhook (failed path)
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 14 | Create Booking | Booking | Use same or another PUBLISHED **tripId**. Send. Copy new `id` → set **bookingId**. |
+| 15 | Payment Webhook | Booking | Body: `"status": "failed"`. Send. Check 200. |
+| 16 | Get Booking By ID | Booking | Send. Check `state: "EXPIRED"`. |
+
+---
+
+### Step 5 – Admin
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 17 | Get Trip Metrics | Admin | Set **tripId** to any existing trip. Send. Check 200, `occupancy_percent`, `booking_summary`, `financial`. |
+| 18 | Get At-Risk Trips | Admin | Send. Check 200, `at_risk_trips` (array; may be empty; seed includes at-risk trips). |
+
+---
+
+### Quick checklist
+
+```
+Trips:     Get All → Get Published → Get By ID → Create → Update → Get By ID [→ Delete]
+Booking:   Create → Get → Webhook success → Get (CONFIRMED) → Cancel → Get (CANCELLED)
+Webhook:   Create → Webhook failed → Get (EXPIRED)
+Admin:     Get Trip Metrics → Get At-Risk Trips
+```
+
+If you run through this order and every request returns the expected status and body, all features are in a working state.
+
+---
+
+## 5. Local setup (without Docker)
+
+1. `npm install`
+2. Copy `.env.example` to `.env` and set `DATABASE_URL` (and `DATABASE_SSL=false` for local Postgres without SSL)
+3. `npm run schema` && `npm run seed`
+4. `npm run dev` (port 5001)

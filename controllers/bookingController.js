@@ -70,7 +70,10 @@ async function cancel(req, res) {
       return res.status(404).json({ error: 'Booking not found' });
     }
     if (result.error === 'INVALID_STATE') {
-      return res.status(409).json({ error: 'Only CONFIRMED bookings can be cancelled' });
+      return res.status(409).json({ error: 'Cannot cancel: booking is already CANCELLED or EXPIRED' });
+    }
+    if (result.error === 'AFTER_CUTOFF') {
+      return res.status(409).json({ error: 'Cannot cancel PENDING_PAYMENT booking: trip is imminent (past refund cutoff)' });
     }
     return res.status(200).json({
       cancelled: result.cancelled,

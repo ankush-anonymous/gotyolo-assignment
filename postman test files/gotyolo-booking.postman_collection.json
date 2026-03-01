@@ -47,7 +47,7 @@
         "method": "POST",
         "header": [],
         "url": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
-        "description": "Cancel a CONFIRMED booking. Set bookingId. 200 with { cancelled: true, refund_amount } or 404 if not found, 409 if not CONFIRMED (Only CONFIRMED bookings can be cancelled)."
+        "description": "Cancel CONFIRMED or PENDING_PAYMENT (before cutoff). CONFIRMED: call after Payment Webhook success. PENDING_PAYMENT: call after Create Booking, no webhook. 200: { cancelled: true, refund_amount }. 404 if not found. 409 if EXPIRED/CANCELLED or PENDING_PAYMENT after cutoff."
       }
     },
     {
@@ -61,6 +61,15 @@
         },
         "url": "{{baseUrl}}/payments/webhook",
         "description": "Simulate payment provider callback. Set bookingId. status: success|failed. Always returns 200."
+      }
+    },
+    {
+      "name": "Cancel PENDING_PAYMENT (before cutoff)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+        "description": "Cancel before payment. Create Booking, set bookingId, then Cancel (do NOT call Payment Webhook). Expect 200, cancelled: true, refund_amount: 0. Seats released. Use trip with start_date far ahead."
       }
     }
   ]

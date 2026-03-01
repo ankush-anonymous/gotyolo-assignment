@@ -62,7 +62,9 @@ async function getBooking(bookingId) {
 async function cancelBooking(bookingId) {
   const row = await bookingRepository.findByIdWithTrip(bookingId);
   if (!row) return { error: 'BOOKING_NOT_FOUND' };
-  if (row.state !== 'CONFIRMED') return { error: 'INVALID_STATE' };
+  if (row.state === 'CANCELLED' || row.state === 'EXPIRED') {
+    return { error: 'INVALID_STATE' };
+  }
 
   const startDate = new Date(row.start_date);
   const daysMs = (row.refundable_until_days_before || 0) * 24 * 60 * 60 * 1000;
@@ -71,11 +73,21 @@ async function cancelBooking(bookingId) {
 
   let refundAmount = 0;
   let releaseSeats = false;
-  if (now < cutoffDate) {
-    const price = Number(row.price_at_booking);
-    const feePercent = Number(row.cancellation_fee_percent) || 0;
-    refundAmount = Math.round(price * (1 - feePercent / 100) * 100) / 100;
+
+  if (row.state === 'PENDING_PAYMENT') {
+    if (now >= cutoffDate) {
+      return { error: 'AFTER_CUTOFF' };
+    }
     releaseSeats = true;
+  } else if (row.state === 'CONFIRMED') {
+    if (now < cutoffDate) {
+      const price = Number(row.price_at_booking);
+      const feePercent = Number(row.cancellation_fee_percent) || 0;
+      refundAmount = Math.round(price * (1 - feePercent / 100) * 100) / 100;
+      releaseSeats = true;
+    }
+  } else {
+    return { error: 'INVALID_STATE' };
   }
 
   await bookingRepository.cancelBooking(

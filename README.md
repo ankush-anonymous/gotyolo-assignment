@@ -115,7 +115,7 @@ gotyolo-assignment/
 | POST | /api/trips/:tripId/book | tripRouter | bookingController.createBooking | bookingService.createBooking | tripRepository.getByIdForUpdate, decrementAvailableSeats; bookingRepository.create | Create booking (lock trip, decrement seats, insert) |
 | GET | /api/bookings | bookingRouter | bookingController.getAll | bookingService.getAllBookings | bookingRepository.findAll | All bookings |
 | GET | /api/bookings/:id | bookingRouter | bookingController.getById | bookingService.getBooking | bookingRepository.findById | Booking by ID |
-| POST | /api/bookings/:id/cancel | bookingRouter | bookingController.cancel | bookingService.cancelBooking | bookingRepository.findByIdWithTrip, cancelBooking; tripRepository.incrementAvailableSeats | Cancel CONFIRMED, refund, release seats |
+| POST | /api/bookings/:id/cancel | bookingRouter | bookingController.cancel | bookingService.cancelBooking | bookingRepository.findByIdWithTrip, cancelBooking; tripRepository.incrementAvailableSeats | Cancel CONFIRMED or PENDING_PAYMENT (before cutoff) |
 | POST | /api/payments/webhook | paymentsRouter | paymentController.webhook | paymentService.processWebhook | bookingRepository.findByIdempotencyKey, getByIdForUpdate, updateBookingState; tripRepository.incrementAvailableSeats (on failed) | Payment success/failed → CONFIRMED/EXPIRED |
 | GET | /admin/trips/:tripId/metrics | adminRouter | adminTripController.getMetrics | — | adminTripRepository.getTripMetrics | Occupancy, booking_summary, financial |
 | GET | /admin/trips/at-risk | adminRouter | adminTripController.getAtRisk | — | adminTripRepository.getAtRiskTrips | Trips: departure < 7 days, occupancy < 50% |
@@ -166,6 +166,20 @@ Use a **PUBLISHED** trip for `tripId` (e.g. from step 1 or the one you updated t
 
 ---
 
+### Step 3b – Cancel PENDING_PAYMENT (before cutoff)
+
+Cancel a booking **before** payment. Do **not** call Payment Webhook.
+
+| # | Request | Collection | What to do |
+|---|---------|------------|------------|
+| 8a | Create Booking | Booking | Set **tripId** = PUBLISHED trip with start_date far ahead (e.g. Paris, April 2026). Send. Copy `id` → set **bookingId**. |
+| 8b | Cancel PENDING_PAYMENT (before cutoff) | Booking | Send (do **not** call Payment Webhook first). Expect 200, `{ cancelled: true, refund_amount: 0 }`. Seats released. |
+| 8c | Get Booking By ID | Booking | Send. Check `state: "CANCELLED"`. |
+
+**Note:** Run within ~15 minutes of creating the booking; otherwise auto-expiry may set it to EXPIRED.
+
+---
+
 ### Step 4 – Payment webhook (failed path)
 
 | # | Request | Collection | What to do |
@@ -190,6 +204,7 @@ Use a **PUBLISHED** trip for `tripId` (e.g. from step 1 or the one you updated t
 ```
 Trips:     Get All → Get Published → Get By ID → Create → Update → Get By ID [→ Delete]
 Booking:   Create → Get → Webhook success → Get (CONFIRMED) → Cancel → Get (CANCELLED)
+Cancel PENDING: Create → Cancel (no webhook) → Get (CANCELLED, refund_amount: 0)
 Webhook:   Create → Webhook failed → Get (EXPIRED)
 Admin:     Get Trip Metrics → Get At-Risk Trips
 ```

@@ -1,18 +1,26 @@
-# PostgreSQL only for now. Node server runs locally.
-# Later: add app service and full stack here.
-
 services:
   db:
     image: postgres:16-alpine
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-appsecret}
-      POSTGRES_DB: ${POSTGRES_DB:-gotyolo}
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: appsecret
+      POSTGRES_DB: gotyolo
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d gotyolo"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
 
-volumes:
-  pgdata:
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://app:appsecret@db:5432/gotyolo
+      DATABASE_SSL: "false"
+      PORT: 5001
+    ports:
+      - "5001:5001"
